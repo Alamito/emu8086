@@ -9,19 +9,54 @@ OpenError DB "Ocorreu um erro (abrindo)!$"
 ReadError DB "Ocorreu um erro (lendo)!$"
 
 messageGetFile DB 'INSIRA O NOME DO ARQUIVO DE LEITURA: ', '$'
+messageGetCripto DB 'INSIRA O TEXTO A SER CRIPTOGRAFADO: ', '$'
 messageNameFile DB 'O NOME DO SEU ARQUIVO Eh: ','$'
+messageTest DB 'aconteceu algo','$'
 menTeste DB 'teste 123', '$'
 
 alBuffer DW 0
 
+stringCripto db 100 dup('$')
+caractereTxt db 0
+
+caractereKrp db 0
+filename db "aarquivo.krp",0
+handler dw ?
+
 BytesLidos  DW 0                ; Bytes lidos do arquivo
 Buffer      DB 4096 dup (?)     ; buffer para armazenar dados
+incTxt dw -1
 FimBuffer   DW $-Buffer         ; Endereço do fim do buffer
 
 .code
 main proc
     mov ax,@data
     mov ds,ax
+
+;--- mensagem de leitura ---;
+    lea dx, messageGetCripto ; load address of the string  
+    mov ah, 09H ;output the string
+    int 21H
+;---------------------------;
+
+    mov bl, 0
+    mov si, offset stringCripto ; si point the array
+getNameCripto:
+    mov ah, 1
+    int 21h
+    cmp al, 13
+    je continua
+    mov [si], al    ; armazena
+    inc si          ; incrementa index 
+    jmp getNameCripto
+
+continua:    
+;--- quebra linha ---;
+    mov ah,2
+    mov dl,0dh
+    int 21h
+    mov dl,0ah
+    int 21h
     
 ;--- mensagem de leitura ---;
     lea dx, messageGetFile ; load address of the string  
@@ -95,18 +130,6 @@ LerBloco:
     int 21h         ; chama serviço do DOS
     
     jc ErrorReading     ; desvia se carry flag estiver ligada - erro!
-    
-    add [BytesLidos], cx    ; adiciona a quantidade de bytes lidos
-    cmp ax, cx              ; compara quantos bytes foram lidos com a quantidade solicitada na função            
-    jb  Continuar           ; sair da leitura, caso seja menor (final do arquivo encontrado!)
-    
-    
-    add dx,512              ; avança o buffer de leitura
-    cmp dx, FimBuffer       ; verifica se chegou no final do buffer
-    jae Continuar           ; se dx for maior ou igual ao final, sair da leitura
-    
-    
-    jmp LerBloco
 
 Continuar:
     mov bx,Handle           ; coloca manipulador do arquivo em bx
@@ -120,18 +143,30 @@ Continuar:
     
 
 NextChar:
-    lodsb           ; AL = próximo caracter da string
+    mov si,OFFSET Buffer
+    inc incTxt
+    add si, incTxt
+    lodsb           ; al = proximo caracter do texto
+    cmp al, '$'     ; final do arquivo
+    je endProgram
+    mov caractereTxt, al
     
-    mov alBuffer, ax; guarda ax para implementacoes (isso foi usado de teste, serve pra nada)
-    cmp al, 32      ; linha de teste
-    je quebra       ; linha de teste
+    mov si, offset stringCripto   ; carrega o ponteiro para a string
+ 
+LOOP1:
+    mov ax, [si]
+    cmp al, caractereTxt
+    je escreveKrp 
+    cmp al, '$'          ; significa fim da string
+    je endProgram
+ 
+    inc si  ; incrementa o ponteiro
+ 
+    jmp LOOP1
     
 segue:
-    cmp ax, 0e00h   ; se chegar no fim da leitura do arquivo
-    je endProgram
     
-    int 10h         ; chama serviço da BIOS
-    loop NextChar
+    jmp NextChar
 
 endProgram: 
     mov ax,4C00h    ; termina programa
@@ -161,7 +196,32 @@ quebra:
     mov dl,0ah
     int 21h
     mov ax, alBuffer    ; devolve o ax para seguir normalmente
-    jmp segue 
+    jmp segue
+    
+escreveKrp:
+    mov caractereKrp, al
+    
+    ;CREATE FILE.
+    mov  ah, 3ch
+    mov  cx, 0
+    mov  dx, offset filename
+    int  21h  
+    
+    ;PRESERVE FILE HANDLER RETURNED.
+    mov  handler, ax
+    
+    ;WRITE STRING.
+    mov  ah, 40h
+    mov  bx, handler
+    mov  cx, 1  ;STRING LENGTH.
+    mov  dx, offset caractereKrp
+    int  21h
+    
+    ;CLOSE FILE (OR DATA WILL BE LOST).
+    mov  ah, 3eh
+    mov  bx, handler
+    int  21h
+    jmp  NextChar
         
 theEnd:
     main endp
