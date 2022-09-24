@@ -1,8 +1,8 @@
 .model small
 .data
 
-nameFile db 100 dup('$')
-nameFileKrp db 100 dup('$')
+nameFile db 105 dup('$')
+nameFileKrp db 105 dup('$')
 txt db ".txt", 0
 krp db ".krp", 0
 lenght dw 0
@@ -14,8 +14,6 @@ messageGetFile DB 'INSIRA O NOME DO ARQUIVO DE LEITURA: ', '$'
 messageGetCripto DB 'INSIRA O TEXTO A SER CRIPTOGRAFADO: ', '$'
 messageNameFile DB 'INPUT: ','$'
 messageNameFileKrp DB 'OUTPUT: ','$'
-messageTest DB 'aconteceu algo','$'
-menTeste DB 'teste 123', '$'
 
 alBuffer DW 0
 
@@ -28,10 +26,11 @@ handler dw ?
 
 BytesLidos  DW 0                ; Bytes lidos do arquivo
 Buffer      DB 4096 dup (?)     ; buffer para armazenar dados
+FimBuffer   DW $-Buffer         ; Endereço do fim do buffer
+
 indexTxt dw 0
 aux_indexTxt db 0
 le_indexTxt dw 0
-FimBuffer   DW $-Buffer         ; Endereço do fim do buffer
 
 .code
 main proc
@@ -144,6 +143,12 @@ concatena_krp:
     mov ah, 09H 
     int 21H
     
+;--- cria arquivo .krp ---;
+    mov  ah, 3ch
+    mov  cx, 0
+    mov  dx, offset nameFileKrp
+    int  21h
+    
 ;--- quebra linha ---;
     mov ah,2
     mov dl,0dh
@@ -166,7 +171,7 @@ LerBloco:
     cmp al, 0
     je theEnd
     mov bx,Handle       ; manipulador em bx
-    mov cx,512      ; quantidade de bytes a serem lidos
+    mov cx,65535      ; quantidade de bytes a serem lidos
     mov ah,3Fh      ; função 3Fh - leitura de arquivo
     int 21h         ; chama serviço do DOS
     
@@ -177,19 +182,14 @@ Continuar:
     mov ah,3Eh              ; função 3Eh - fechar um arquivo
     int 21h                 ; chama serviço do DOS
     
-    mov cx,[BytesLidos]     ; comprimento da string (Ler o valor da variável BytesLidos)
-    mov si,OFFSET Buffer    ; DS:SI - endereço da string
-    xor bh,bh               ; página de vídeo - 0
-    mov ah,0Eh              ; função 0Eh - escrever caracter
-    
 
 NextChar:
-    mov si,OFFSET Buffer
+    mov si, offset Buffer
     inc indexTxt
     add si, indexTxt
     lodsb           ; al = proximo caracter do texto
     cmp al, 0     ; final do arquivo
-    je endProgram
+    je  endProgram
     mov caractereTxt, al
     
     mov si, offset stringCripto   ; carrega o ponteiro para a string
@@ -197,9 +197,9 @@ NextChar:
 LOOP1:
     mov ax, [si]
     cmp al, caractereTxt
-    je escreveKrp 
+    je  escreveKrp 
     cmp al, '$'          ; significa fim da string
-    je NextChar
+    je  NextChar
  
     inc si  ; incrementa o ponteiro
  
@@ -216,37 +216,42 @@ endProgram:
 escreveKrp:
     mov caractereKrp, al
     
-    ;CREATE FILE.
-    mov  ah, 3ch
-    mov  cx, 0
-    mov  dx, offset nameFileKrp
-    int  21h  
-    
-    ;PRESERVE FILE HANDLER RETURNED.
-    mov  handler, ax
-    
-    ;WRITE 
-    mov  ah, 40h
-    mov  bx, handler
-    mov  cx, 2  ;STRING LENGTH 
-    
 ;--- transforma indexTxt em little endian ---;
     mov dx, indexTxt
     mov dh, aux_indexTxt
     mov dh, dl
     mov dl, aux_indexTxt
-    mov le_indexTxt, dx      
+    mov le_indexTxt, dx
     
-    mov  dx, offset le_indexTxt
-    int  21h
-    
-    
-    ;CLOSE FILE (OR DATA WILL BE LOST).
-    mov  ah, 3eh
-    mov  bx, handler
-    int  21h
-    jmp  NextChar
+;--- abre arquivo para escrita ---;  
+    mov ah, 3dh
+    mov al, 1
+    mov dx, offset nameFileKrp
+    int 21h
+   
+    mov [handle], ax
 
+;--- coloca o file pointer para o final do arquivo ---;    
+    mov bx, ax
+    mov ah, 42h  ; "lseek"
+    mov al, 2    ; position relative to end of file
+    mov cx, 0    ; offset MSW
+    mov dx, 0    ; offset LSW
+    int 21h
+
+;--- escreve no arquivo ---;   
+    mov bx, [handle]
+    mov dx, offset le_indexTxt
+    mov cx, 2
+    mov ah, 40h
+    int 21h 
+
+;--- fecha o arquivo ---;    
+    mov bx, [handle]
+    mov ah, 3eh
+    int 21h 
+    
+    jmp  NextChar
 
 ErrorOpening:
     mov dx,offset OpenError ; exibe um erro
