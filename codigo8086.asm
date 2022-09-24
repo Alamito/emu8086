@@ -29,6 +29,8 @@ handler dw ?
 BytesLidos  DW 0                ; Bytes lidos do arquivo
 Buffer      DB 4096 dup (?)     ; buffer para armazenar dados
 indexTxt dw 0
+aux_indexTxt db 0
+le_indexTxt dw 0
 FimBuffer   DW $-Buffer         ; Endereço do fim do buffer
 
 .code
@@ -226,9 +228,18 @@ escreveKrp:
     ;WRITE 
     mov  ah, 40h
     mov  bx, handler
-    mov  cx, 2  ;STRING LENGTH.
-    mov  dx, offset indexTxt
+    mov  cx, 2  ;STRING LENGTH 
+    
+;--- transforma indexTxt em little endian ---;
+    mov dx, indexTxt
+    mov dh, aux_indexTxt
+    mov dh, dl
+    mov dl, aux_indexTxt
+    mov le_indexTxt, dx      
+    
+    mov  dx, offset le_indexTxt
     int  21h
+    
     
     ;CLOSE FILE (OR DATA WILL BE LOST).
     mov  ah, 3eh
