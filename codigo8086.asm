@@ -2,7 +2,9 @@
 .data
 
 nameFile db 100 dup('$')
+nameFileKrp db 100 dup('$')
 txt db ".txt", 0
+krp db ".krp", 0
 lenght dw 0
 Handle DW ?             ; para guardar o manipulador do arquivo
 OpenError DB "Ocorreu um erro (abrindo)!$"
@@ -10,7 +12,8 @@ ReadError DB "Ocorreu um erro (lendo)!$"
 
 messageGetFile DB 'INSIRA O NOME DO ARQUIVO DE LEITURA: ', '$'
 messageGetCripto DB 'INSIRA O TEXTO A SER CRIPTOGRAFADO: ', '$'
-messageNameFile DB 'O NOME DO SEU ARQUIVO Eh: ','$'
+messageNameFile DB 'INPUT: ','$'
+messageNameFileKrp DB 'OUTPUT: ','$'
 messageTest DB 'aconteceu algo','$'
 menTeste DB 'teste 123', '$'
 
@@ -25,7 +28,7 @@ handler dw ?
 
 BytesLidos  DW 0                ; Bytes lidos do arquivo
 Buffer      DB 4096 dup (?)     ; buffer para armazenar dados
-incTxt dw -1
+indexTxt dw 0
 FimBuffer   DW $-Buffer         ; Endereço do fim do buffer
 
 .code
@@ -37,8 +40,8 @@ main proc
     lea dx, messageGetCripto ; load address of the string  
     mov ah, 09H ;output the string
     int 21H
-;---------------------------;
 
+;--- pega a string q sera criptografada ---;
     mov bl, 0
     mov si, offset stringCripto ; si point the array
 getNameCripto:
@@ -64,18 +67,28 @@ continua:
     int 21H
 ;---------------------------;    
     
-;--- inicia leitura do nome do arquivo ---;    
+;--- leitura do nome do arquivo ---;    
     mov bl, 0
     mov si, offset nameFile ; si point the array
 getNameFile:
     mov ah, 1
     int 21h
     cmp al, 13
-    je concatena_txt
+    je strCopy
     mov [si], al    ; armazena 
     inc si          ; incrementa index
     mov lenght, si     ; armazena o tamanho da string
     jmp getNameFile
+    
+strCopy:
+    cld
+    mov     ax  , data
+    mov     DS  , ax
+    mov     ES  , ax
+    mov cx, lenght
+    lea si, nameFile
+    lea di, nameFileKrp
+    rep movsb
     
 concatena_txt:
     cld
@@ -84,6 +97,17 @@ concatena_txt:
     mov     ES  , ax
     mov     SI  , offset txt    ; ponteiro para txt
     mov     DI  , offset nameFile  ; ponteiro para o array
+    add     DI  , lenght
+    mov     cx  , 5
+    rep movsb ; This should concat two strings
+    
+concatena_krp:
+    cld
+    mov     ax  , data
+    mov     DS  , ax
+    mov     ES  , ax
+    mov     SI  , offset krp    ; ponteiro para txt
+    mov     DI  , offset nameFileKrp  ; ponteiro para o array
     add     DI  , lenght
     mov     cx  , 5
     rep movsb ; This should concat two strings
@@ -103,6 +127,21 @@ concatena_txt:
     mov ah, 09H 
     int 21H
 
+;--- quebra linha ---;
+    mov ah,2
+    mov dl,0dh
+    int 21h
+    mov dl,0ah
+    int 21h
+    
+;--- mensagem de leitura ---;
+    lea dx, messageNameFileKrp   
+    mov ah, 09H 
+    int 21H
+    lea dx, nameFileKrp 
+    mov ah, 09H 
+    int 21H
+    
 ;--- quebra linha ---;
     mov ah,2
     mov dl,0dh
@@ -144,10 +183,10 @@ Continuar:
 
 NextChar:
     mov si,OFFSET Buffer
-    inc incTxt
-    add si, incTxt
+    inc indexTxt
+    add si, indexTxt
     lodsb           ; al = proximo caracter do texto
-    cmp al, '$'     ; final do arquivo
+    cmp al, 0     ; final do arquivo
     je endProgram
     mov caractereTxt, al
     
@@ -158,7 +197,7 @@ LOOP1:
     cmp al, caractereTxt
     je escreveKrp 
     cmp al, '$'          ; significa fim da string
-    je endProgram
+    je NextChar
  
     inc si  ; incrementa o ponteiro
  
@@ -172,9 +211,33 @@ endProgram:
     mov ax,4C00h    ; termina programa
     int 21h
       
+escreveKrp:
+    mov caractereKrp, al
+    
+    ;CREATE FILE.
+    mov  ah, 3ch
+    mov  cx, 0
+    mov  dx, offset nameFileKrp
+    int  21h  
+    
+    ;PRESERVE FILE HANDLER RETURNED.
+    mov  handler, ax
+    
+    ;WRITE 
+    mov  ah, 40h
+    mov  bx, handler
+    mov  cx, 2  ;STRING LENGTH.
+    mov  dx, offset indexTxt
+    int  21h
+    
+    ;CLOSE FILE (OR DATA WILL BE LOST).
+    mov  ah, 3eh
+    mov  bx, handler
+    int  21h
+    jmp  NextChar
+
 
 ErrorOpening:
-
     mov dx,offset OpenError ; exibe um erro
     mov ah,09h      ; usando a função 09h
     int 21h         ; chama serviço do DOS
@@ -188,40 +251,13 @@ ErrorReading:
     mov ax,4C02h        ; termina programa com um errorlevel =2
     int 21h
 
-quebra:
+quebraLinha:
 ;--- quebra linha ---;
     mov ah,2
     mov dl,0dh
     int 21h
     mov dl,0ah
     int 21h
-    mov ax, alBuffer    ; devolve o ax para seguir normalmente
-    jmp segue
-    
-escreveKrp:
-    mov caractereKrp, al
-    
-    ;CREATE FILE.
-    mov  ah, 3ch
-    mov  cx, 0
-    mov  dx, offset filename
-    int  21h  
-    
-    ;PRESERVE FILE HANDLER RETURNED.
-    mov  handler, ax
-    
-    ;WRITE STRING.
-    mov  ah, 40h
-    mov  bx, handler
-    mov  cx, 1  ;STRING LENGTH.
-    mov  dx, offset caractereKrp
-    int  21h
-    
-    ;CLOSE FILE (OR DATA WILL BE LOST).
-    mov  ah, 3eh
-    mov  bx, handler
-    int  21h
-    jmp  NextChar
         
 theEnd:
     main endp
