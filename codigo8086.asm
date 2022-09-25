@@ -19,6 +19,7 @@ alBuffer DW 0
 
 stringCripto db 100 dup('$')
 caractereTxt db 0
+caractereStr db 0
 
 caractereKrp db 0
 filename db "aarquivo.krp",0
@@ -29,6 +30,7 @@ Buffer      DB 4096 dup (?)     ; buffer para armazenar dados
 FimBuffer   DW $-Buffer         ; Endereço do fim do buffer
 
 indexTxt dw 0
+indexString dw 0
 aux_indexTxt db 0
 le_indexTxt dw 0
 
@@ -183,31 +185,28 @@ Continuar:
     int 21h                 ; chama serviço do DOS
     
 
-NextChar:
+nextString:
+    mov si, offset stringCripto ; ponteiro para o inicio da string
+    add si, indexString         ; pula para a letra da string
+    mov ax, [si]                ; al fica com o valor do char da string
+    cmp al, '$'                 ; fim da string
+    je endProgram               ; pula para o fim do programa (chegou no final da string)
+    mov caractereStr, al        ; coloca char em outra variavel para cmp com char do txt
+    inc indexString             ; incrementa o index para iterar entre a string
+    
     mov si, offset Buffer
-    inc indexTxt
-    add si, indexTxt
-    lodsb           ; al = proximo caracter do texto
-    cmp al, 0     ; final do arquivo
-    je  endProgram
-    mov caractereTxt, al
+    lodsb                   ; evita cmp com o 1 caractere
+    mov indexTxt, 0         ; reset da posicao no txt
     
-    mov si, offset stringCripto   ; carrega o ponteiro para a string
+nextTxt:
+    inc indexTxt            ; salva valor da posicao no txt
+    lodsb
+    cmp al, caractereStr    ; comparacao char txt Vs char string
+    je escreveKrp           ; se forem iguais escreve no .krp
+    cmp al, 0               ; fim do txt
+    je nextString             ; vai para a proximo char da string
  
-LOOP1:
-    mov ax, [si]
-    cmp al, caractereTxt
-    je  escreveKrp 
-    cmp al, '$'          ; significa fim da string
-    je  NextChar
- 
-    inc si  ; incrementa o ponteiro
- 
-    jmp LOOP1
-    
-segue:
-    
-    jmp NextChar
+    jmp nextTxt
 
 endProgram: 
     mov ax,4C00h    ; termina programa
@@ -251,7 +250,7 @@ escreveKrp:
     mov ah, 3eh
     int 21h 
     
-    jmp  NextChar
+    jmp  nextString
 
 ErrorOpening:
     mov dx,offset OpenError ; exibe um erro
