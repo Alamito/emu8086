@@ -1,38 +1,34 @@
 .model small
 .data
 
+;--- variaveis de arquivo ---;
 nameFile db 105 dup('$')
 nameFileKrp db 105 dup('$')
-txt db ".txt", 0
-krp db ".krp", 0
-lenght dw 0
-Handle DW ?             ; para guardar o manipulador do arquivo
+stringCripto db 105 dup('$')
+Handle DW ?                  ; guarda o manipulador do arquivo
+Buffer DB 4096 dup (?)       ; buffer para armazenar dados
+handler dw ?
+
+;--- variaveis de auxilio/logica/iteracao ---;
+caractereStr db 0            ; guarda caractere da string
+txt db ".txt", 0             ; sera concatenado
+krp db ".krp", 0             ; sera concatenado
+lenght dw 0                  ; guarda o tamanho da string
+indexTxt dw 0                ; guarda posicao do txt
+indexString dw 0             ; guarda posicao da string
+aux_indexTxt db 0            ; auxilio na transformacao para little endian
+le_indexTxt dw 0             ; guarda o valor em little endian
+
+;--- mensagens ao user ---;
 OpenError DB "Ocorreu um erro (abrindo)!$"
 ReadError DB "Ocorreu um erro (lendo)!$"
-
 messageGetFile DB 'INSIRA O NOME DO ARQUIVO DE LEITURA: ', '$'
 messageGetCripto DB 'INSIRA O TEXTO A SER CRIPTOGRAFADO: ', '$'
 messageNameFile DB 'INPUT: ','$'
 messageNameFileKrp DB 'OUTPUT: ','$'
-
-alBuffer DW 0
-
-stringCripto db 100 dup('$')
-caractereTxt db 0
-caractereStr db 0
-
-caractereKrp db 0
-filename db "aarquivo.krp",0
-handler dw ?
-
-BytesLidos  DW 0                ; Bytes lidos do arquivo
-Buffer      DB 4096 dup (?)     ; buffer para armazenar dados
-FimBuffer   DW $-Buffer         ; Endereço do fim do buffer
-
-indexTxt dw 0
-indexString dw 0
-aux_indexTxt db 0
-le_indexTxt dw 0
+messageVazio db 'ARQUIVO (.txt) DE LEITURA VAZIO', '$'
+messageInvalido db 'CARACTERE INVALIDO!', '$'
+ 
 
 .code
 main proc
@@ -93,7 +89,7 @@ strCopy:
     lea di, nameFileKrp
     rep movsb
     
-concatena_txt:
+;--- concatena .txt ---;
     cld
     mov     ax  , data
     mov     DS  , ax
@@ -102,9 +98,9 @@ concatena_txt:
     mov     DI  , offset nameFile  ; ponteiro para o array
     add     DI  , lenght
     mov     cx  , 5
-    rep movsb ; This should concat two strings
+    rep movsb                   ; concatena as string
     
-concatena_krp:
+;--- concatena .krp ---;
     cld
     mov     ax  , data
     mov     DS  , ax
@@ -113,7 +109,7 @@ concatena_krp:
     mov     DI  , offset nameFileKrp  ; ponteiro para o array
     add     DI  , lenght
     mov     cx  , 5
-    rep movsb ; This should concat two strings
+    rep movsb                   ; concatena as string
 
 ;--- quebra linha ---;
     mov ah,2
@@ -159,13 +155,13 @@ concatena_krp:
     int 21h
 
 ;--- inicia leitura do arquivo .txt ---;    
-    mov dx,offset nameFile  ; coloca o endereço do nome do arquivo em dx
-    mov al,2        ; modo de acesso - leitura e escrita
-    mov ah,3Dh      ; função 3Dh - abre um arquivo
-    int 21h         ; chama serviço do DOS
+    mov dx,offset nameFile  ; coloca o endereco do nome do arquivo em dx
+    mov al,2                ; modo de acesso - leitura e escrita
+    mov ah,3Dh              ; funcao 3Dh - abre um arquivo
+    int 21h                 ; chama serviço do DOS
     
-    mov Handle,ax       ; guarda o manipulador do arquivo para mais tarde
-    jc ErrorOpening     ; desvia se carry flag estiver ligada - erro!
+    mov Handle,ax           ; guarda o manipulador do arquivo para mais tarde
+    jc ErrorOpening         ; desvia se carry flag estiver ligada - erro!
     
     mov dx,offset Buffer    ; endereço do buffer em dx
 
@@ -173,17 +169,11 @@ LerBloco:
     cmp al, 0
     je theEnd
     mov bx,Handle       ; manipulador em bx
-    mov cx,65535      ; quantidade de bytes a serem lidos
-    mov ah,3Fh      ; função 3Fh - leitura de arquivo
-    int 21h         ; chama serviço do DOS
+    mov cx,65535        ; quantidade de bytes a serem lidos
+    mov ah,3Fh          ; funcao 3Fh - leitura de arquivo
+    int 21h             ; chama serviço do DOS
     
     jc ErrorReading     ; desvia se carry flag estiver ligada - erro!
-
-Continuar:
-    mov bx,Handle           ; coloca manipulador do arquivo em bx
-    mov ah,3Eh              ; função 3Eh - fechar um arquivo
-    int 21h                 ; chama serviço do DOS
-    
 
 nextString:
     mov si, offset stringCripto ; ponteiro para o inicio da string
@@ -194,6 +184,13 @@ nextString:
     mov caractereStr, al        ; coloca char em outra variavel para cmp com char do txt
     inc indexString             ; incrementa o index para iterar entre a string
     
+    cmp caractereStr, 020h      
+    jle charInvalido            ; menor ou igual a 20 em hexa
+    
+    cmp caractereStr, 041h
+    jnl toLowerStr              ; maior ou igual a 61 em hexa
+    
+segue:
     mov si, offset Buffer
     lodsb                   ; evita cmp com o 1 caractere
     mov indexTxt, 0         ; reset da posicao no txt
@@ -201,20 +198,19 @@ nextString:
 nextTxt:
     inc indexTxt            ; salva valor da posicao no txt
     lodsb
+    
+    cmp al, 041h
+    jnl toLowerTxt          ; maior ou igual a 61 em hexa
+    
+avante:    
     cmp al, caractereStr    ; comparacao char txt Vs char string
     je escreveKrp           ; se forem iguais escreve no .krp
     cmp al, 0               ; fim do txt
     je nextString             ; vai para a proximo char da string
  
     jmp nextTxt
-
-endProgram: 
-    mov ax,4C00h    ; termina programa
-    int 21h
       
 escreveKrp:
-    mov caractereKrp, al
-    
 ;--- transforma indexTxt em little endian ---;
     mov dx, indexTxt
     mov dh, aux_indexTxt
@@ -265,6 +261,34 @@ ErrorReading:
     int 21h         ; chama serviço do DOS
     mov ax,4C02h        ; termina programa com um errorlevel =2
     int 21h
+    
+charInvalido:
+    lea dx, messageInvalido ; load address of the string  
+    mov ah, 09H ;output the string
+    int 21H
+;--- quebra linha ---;
+    mov ah,2
+    mov dl,0dh
+    int 21h
+    mov dl,0ah
+    int 21h
+    jmp nextString
+
+toLowerStr:
+    cmp caractereStr, 05Bh
+    jnl segue               ; nao precisa transformar
+    add caractereStr, 020h  ; transforma em um char minusculo
+    jmp segue               
+
+toLowerTxt:
+    cmp al, 05Bh
+    jnl avante              ; nao precisa transformar
+    add al, 020h            ; transforma em um char minusculo
+    jmp avante
+    
+endProgram: 
+    mov ax,4C00h    ; termina programa
+    int 21h
 
 quebraLinha:
 ;--- quebra linha ---;
@@ -275,5 +299,6 @@ quebraLinha:
     int 21h
         
 theEnd:
+    
     main endp
 end main
