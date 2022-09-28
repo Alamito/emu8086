@@ -23,7 +23,9 @@ iteracaoArray dw 0              ; usado para terminar o loop de comparacoes com 
 indicadorArray dw 0             ; indica quantos bytes deve ser pulado desde o inicio do vetor de posicoes
 indicadorPosicao dw 0           ; indica os bytes a serem pulados no vetor de posicao
 flagCharFrase db 0
-arrayPosicao dw 65535 dup (?)   ; guarda em um vetor as posicoes ja usadas do .txt
+lenghtFrase db 0
+errorProgram db 0
+arrayPosicao dw 105 dup (?)   ; guarda em um vetor as posicoes ja usadas do .txt
 
 ;--- mensagens ao user ---;
 OpenError DB 'OCORREU UM ERRO NA ABERTURA DO ARQUIVO!', '$'
@@ -36,6 +38,10 @@ messageNameFileKrp DB 'OUTPUT: ','$'
 messageVazio db 'ARQUIVO (.txt) DE LEITURA VAZIO', '$'
 messageInvalido db 'CARACTERE INVALIDO!', '$'
 messageCharFrase db 'CARACTERE NAO ENCONTRADO NO ARQUIVO', '$'
+messageSize db 'TAMANHO DA FRASE: ', '$'
+messageBytes db ' bytes', '$'
+messageFalseError db 'PROCESSAMENTO REALIZADO SEM ERROS', '$'
+messageTrueError db 'PROCESSAMENTO REALIZADO COM ERROS', '$'
  
 
 .code
@@ -57,7 +63,8 @@ getNameCripto:
     cmp al, 13
     je continua
     mov [si], al    ; armazena
-    inc si          ; incrementa index 
+    inc si          ; incrementa index
+    inc lenghtFrase
     jmp getNameCripto
 
 continua:    
@@ -69,8 +76,9 @@ continua:
     int 21h
     
 ;--- mensagem de leitura ---;
-    lea dx, messageGetFile ; load address of the string  
-    mov ah, 09H ;output the string
+    lea dx, messageGetFile   
+    mov ah, 09H 
+    
     int 21H
 ;---------------------------;    
     
@@ -118,6 +126,13 @@ strCopy:
     add     DI  , lenght
     mov     cx  , 5
     rep movsb                   ; concatena as string
+
+;--- quebra linha ---;
+    mov ah,2
+    mov dl,0dh
+    int 21h
+    mov dl,0ah
+    int 21h
 
 ;--- quebra linha ---;
     mov ah,2
@@ -292,6 +307,8 @@ TestaCharFrase:
     cmp flagCharFrase, 1       
     je  nextString
     
+    mov errorProgram, 1
+    
 ;--- mensagem de caractere nao encontrado ---;
     lea dx, messageCharFrase   
     mov ah, 09H 
@@ -328,6 +345,7 @@ erroCriacao:
     jmp endProgram
     
 charInvalido:
+    mov errorProgram, 1
     lea dx, messageInvalido ; load address of the string  
     mov ah, 09H             ; output the string
     int 21H
@@ -358,7 +376,54 @@ retornaValor:
     jmp nextTxt             ; pula para o proximo char dps do que foi recem testado
     
     
-endProgram: 
+endProgram:
+;--- quebra linha ---;
+    mov ah,2
+    mov dl,0dh
+    int 21h
+    mov dl,0ah
+    int 21h
+
+;--- mensagem de tamanho ---; 
+    lea dx, messageSize   
+    mov ah, 09H 
+    int 21H
+    
+    add lenghtFrase, 48     ; leva o valor ate o escopo de numero da tabela ASCII
+    mov ah, 2
+    mov dl, lenghtFrase
+    int 21h
+    
+    lea dx, messageBytes    ; imprime " bytes"   
+    mov ah, 09H 
+    int 21H
+    
+;--- quebra linha ---;
+    mov ah,2
+    mov dl,0dh
+    int 21h
+    mov dl,0ah
+    int 21h
+    
+;--- quebra linha ---;
+    mov ah,2
+    mov dl,0dh
+    int 21h
+    mov dl,0ah
+    int 21h
+    
+    cmp errorProgram, 1
+    je trueError
+    lea dx, messageFalseError   
+    mov ah, 09H 
+    int 21H
+    jmp theEnd
+    
+trueError:
+    lea dx, messageTrueError   
+    mov ah, 09H 
+    int 21H
+theEnd:
     mov ax,4C00h    ; termina programa
     int 21h
 
@@ -369,8 +434,6 @@ quebraLinha:
     int 21h
     mov dl,0ah
     int 21h
-        
-theEnd:
     
     main endp
 end main
