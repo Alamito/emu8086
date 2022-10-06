@@ -2,8 +2,8 @@
 .data
 
 ;--- variaveis de arquivo ---;
-nameFile db 105 dup('$')
-nameFileKrp db 105 dup('$')
+nameFile db 15 dup('$')
+nameFileKrp db 15 dup('$')
 stringCripto db 105 dup('$')
 Handle DW ?                  ; guarda o manipulador do arquivo
 Buffer DB 4096 dup (?)       ; buffer para armazenar dados
@@ -11,20 +11,19 @@ handler dw ?
 
 ;--- variaveis de auxilio/logica/iteracao ---;
 caractereStr db 0               ; guarda caractere da string
-txt db ".txt", 0                ; sera concatenado
-krp db ".krp", 0                ; sera concatenado
+txt db ".txt", '$'                ; sera concatenado
+krp db ".krp", '$'                ; sera concatenado
 lenght dw 0                     ; guarda o tamanho da string
 indexTxt dw 0                   ; guarda posicao do txt
 indexString dw 0                ; guarda posicao da string
-aux_indexTxt db 0               ; auxilio na transformacao para little endian
-le_indexTxt dw 0                ; guarda o valor em little endian
 lenghtArray dw 0                ; guarda o tamanho do vetor de posicoes
 iteracaoArray dw 0              ; usado para terminar o loop de comparacoes com o vetor de posicoes
 indicadorArray dw 0             ; indica quantos bytes deve ser pulado desde o inicio do vetor de posicoes
 indicadorPosicao dw 0           ; indica os bytes a serem pulados no vetor de posicao
 flagCharFrase db 0
-lenghtFrase db 0
+lenghtFrase db '0', '0', '0', 0
 errorProgram db 0
+zero dw 0
 arrayPosicao dw 105 dup (?)   ; guarda em um vetor as posicoes ja usadas do .txt
 
 ;--- mensagens ao user ---;
@@ -50,22 +49,56 @@ main proc
     mov ds,ax
 
 ;--- mensagem de leitura ---;
-    lea dx, messageGetCripto ; load address of the string  
-    mov ah, 09H ;output the string
+    lea dx, messageGetCripto    ; carrega endereco da string  
+    mov ah, 09H                 ; printa string
     int 21H
 
 ;--- pega a string q sera criptografada ---;
     mov bl, 0
-    mov si, offset stringCripto ; si point the array
+    mov si, offset stringCripto ; ponteiro para o array
+    mov di, offset lenghtFrase
 getNameCripto:
     mov ah, 1
     int 21h
     cmp al, 13
     je continua
-    mov [si], al    ; armazena
-    inc si          ; incrementa index
-    inc lenghtFrase
+    mov [si], al                ; armazena
+    inc si                      ; incrementa index  
+                          
+    mov al, [di+2]
+    cmp al,'9'
+    je incrementaDecimos
+    inc al
+    mov [di+2],al
+loopContador:
     jmp getNameCripto
+
+incrementaDecimos:
+    mov al, '0'
+    mov [di+2], al
+    mov al, [di+1]
+    cmp al,'9'
+    je incrementaCentesimos
+    inc al
+    mov [di+1],al
+    jmp loopContador
+incrementaCentesimos:
+    mov al, '0'
+    mov [di+1], al
+    mov al, [di]
+    cmp al,'1'
+    je tratarCentesimo
+    mov al, '1'
+    mov [di],al
+    jmp loopContador
+
+tratarCentesimo:
+    mov al,[di+2]
+    cmp al, '1'
+    ;je erroFraselonga
+    jmp loopContador
+
+
 
 continua:    
 ;--- quebra linha ---;
@@ -90,42 +123,24 @@ getNameFile:
     int 21h
     cmp al, 13
     je strCopy
-    mov [si], al    ; armazena 
+    mov [si], al    ; armazena
     inc si          ; incrementa index
-    mov lenght, si     ; armazena o tamanho da string
     jmp getNameFile
     
 strCopy:
-    cld
-    mov     ax  , data
-    mov     DS  , ax
-    mov     ES  , ax
-    mov cx, lenght
-    lea si, nameFile
-    lea di, nameFileKrp
-    rep movsb
     
 ;--- concatena .txt ---;
-    cld
-    mov     ax  , data
-    mov     DS  , ax
-    mov     ES  , ax
-    mov     SI  , offset txt    ; ponteiro para txt
-    mov     DI  , offset nameFile  ; ponteiro para o array
-    add     DI  , lenght
-    mov     cx  , 5
-    rep movsb                   ; concatena as string
+    lea si, nameFile
+    lea di, nameFileKrp
+    call CopyString
     
-;--- concatena .krp ---;
-    cld
-    mov     ax  , data
-    mov     DS  , ax
-    mov     ES  , ax
-    mov     SI  , offset krp    ; ponteiro para txt
-    mov     DI  , offset nameFileKrp  ; ponteiro para o array
-    add     DI  , lenght
-    mov     cx  , 5
-    rep movsb                   ; concatena as string
+    lea si, nameFile
+    lea di, txt
+    call ConcatTxt
+   
+    lea si, nameFileKrp
+    lea di, krp
+    call ConcatTxt
 
 ;--- quebra linha ---;
     mov ah,2
@@ -167,8 +182,9 @@ strCopy:
 ;--- cria arquivo .krp ---;
     mov  ah, 3ch
     mov  cx, 0
-    mov  dx, offset nameFileKrp
+    lea  dx, nameFileKrp
     int  21h
+    mov  bx, ax
     jc erroCriacao
     
 ;--- quebra linha ---;
@@ -182,12 +198,12 @@ strCopy:
     mov dx,offset nameFile  ; coloca o endereco do nome do arquivo em dx
     mov al,2                ; modo de acesso - leitura e escrita
     mov ah,3Dh              ; funcao 3Dh - abre um arquivo
-    int 21h                 ; chama serviço do DOS
+    int 21h                 ; chama serviï¿½o do DOS
     
     mov Handle,ax           ; guarda o manipulador do arquivo para mais tarde
     jc ErrorOpening         ; desvia se carry flag estiver ligada - erro!
     
-    mov dx,offset Buffer    ; endereço do buffer em dx
+    mov dx,offset Buffer    ; endereï¿½o do buffer em dx
 
 LerBloco:
     cmp al, 0
@@ -195,7 +211,7 @@ LerBloco:
     mov bx,Handle       ; manipulador em bx
     mov cx,65535        ; quantidade de bytes a serem lidos
     mov ah,3Fh          ; funcao 3Fh - leitura de arquivo
-    int 21h             ; chama serviço do DOS
+    int 21h             ; chama serviï¿½o do DOS
     
     jc ErrorReading     ; desvia se carry flag estiver ligada - erro!
 
@@ -263,14 +279,6 @@ armazenaPosicao:                 ; armazena a posicao do .txt no vetor
     add indicadorArray, 2        ; proximo espaco vazio do vetor
     inc lenghtArray              ; conta o tamanho do vetor
     
-
-;--- transforma indexTxt em little endian ---;
-    ;mov dx, indexTxt
-    ;mov dh, aux_indexTxt
-    ;mov dh, dl
-    ;mov dl, aux_indexTxt
-    ;mov le_indexTxt, dx
-    
 ;--- abre arquivo para escrita ---;  
     mov ah, 3dh
     mov al, 1
@@ -325,24 +333,27 @@ TestaCharFrase:
     
 
 ErrorOpening:
+;--- printa mensagem de erro ---;
     mov dx,offset OpenError ; exibe um erro
-    mov ah,09h              ; usando a função 09h
-    int 21h                 ; chama serviço do DOS
+    mov ah,09h              ; usando a funï¿½ï¿½o 09h
+    int 21h                 ; chama serviï¿½o do DOS
     mov ax,4C01h            ; termina programa com um errorlevel =1 
     int 21h 
 
 ErrorReading:
-    mov dx,offset ReadError ; exibe um erro
-    mov ah,09h              ; usando a função 09h
-    int 21h                 ; chama serviço do DOS
+;--- printa mensagem de erro ---;
+    mov dx, offset ReadError ; exibe um erro
+    mov ah,09h              ; usando a funï¿½ï¿½o 09h
+    int 21h                 ; chama serviï¿½o do DOS
     mov ax,4C02h            ; termina programa com um errorlevel =2
     int 21h
     
 erroCriacao:
-    lea dx, messageCriaco ; load address of the string  
-    mov ah, 09H ;output the string
+;--- printa mensagem de erro ---;
+    lea dx, messageCriaco 
+    mov ah, 09H 
     int 21H
-    jmp endProgram
+    jmp theEnd
     
 charInvalido:
     mov errorProgram, 1
@@ -377,6 +388,33 @@ retornaValor:
     
     
 endProgram:
+    ;--- abre arquivo para escrita ---;  
+    mov ah, 3dh
+    mov al, 1
+    mov dx, offset nameFileKrp
+    int 21h
+   
+    mov [handle], ax
+
+;--- coloca o file pointer para o final do arquivo ---;    
+    mov bx, ax
+    mov ah, 42h  ; "lseek"
+    mov al, 2    ; position relative to end of file
+    mov cx, 0    ; offset MSW
+    mov dx, 0    ; offset LSW
+    int 21h
+
+;--- escreve no arquivo ---;   
+    mov bx, [handle]
+    mov dx, offset zero
+    mov cx, 2
+    mov ah, 40h
+    int 21h 
+
+;--- fecha o arquivo ---;    
+    mov bx, [handle]
+    mov ah, 3eh
+    int 21h
 ;--- quebra linha ---;
     mov ah,2
     mov dl,0dh
@@ -388,11 +426,9 @@ endProgram:
     lea dx, messageSize   
     mov ah, 09H 
     int 21H
-    
-    add lenghtFrase, 48     ; leva o valor ate o escopo de numero da tabela ASCII
-    mov ah, 2
-    mov dl, lenghtFrase
-    int 21h
+
+    lea bx, lenghtFrase
+    call printf_s
     
     lea dx, messageBytes    ; imprime " bytes"   
     mov ah, 09H 
@@ -426,14 +462,63 @@ trueError:
 theEnd:
     mov ax,4C00h    ; termina programa
     int 21h
-
-quebraLinha:
-;--- quebra linha ---;
-    mov ah,2
-    mov dl,0dh
-    int 21h
-    mov dl,0ah
-    int 21h
     
     main endp
+
+
+
+ConcatTxt  proc    near
+init_concat:
+    mov al, '$'
+    cmp al, [si]
+    je  sai_concat1
+    inc si
+    jmp init_concat
+sai_concat1:
+    mov al , '$'
+    cmp al, [di]
+    je out_loop
+    mov dl, [di]
+    mov [si], dl
+    inc di
+    inc si
+    jmp sai_concat1
+out_loop:
+    mov al, 0h
+    mov [si], al
+    ret
+concatTxt endp
+
+CopyString  proc    near
+loop_copy:
+    mov al, '$'
+    cmp [si], al
+    je out_copy
+    mov bl,[si]
+    mov [di], bl
+    inc si
+    inc di
+    jmp loop_copy
+out_copy:
+    mov [di], al
+    ret
+CopyString  endp
+
+printf_s	proc	near
+	mov		dl,[bx]
+	cmp		dl,0
+	je		ps_1
+
+	push	bx
+	mov		ah,2
+	int		21H
+	pop		bx
+
+	inc		bx		
+	jmp		printf_s
+		
+ps_1:
+	ret
+printf_s	endp
+
 end main
