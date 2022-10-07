@@ -22,7 +22,8 @@ indicadorArray dw 0             ; indica quantos bytes deve ser pulado desde o i
 indicadorPosicao dw 0           ; indica os bytes a serem pulados no vetor de posicao
 flagCharFrase db 0
 lenghtFrase db '0', '0', '0', 0
-lenghtTXT db '0', '0', '0', '0', '0', 0
+lenghtTXT_number dw 0
+lenghtTXT_str db '0', '0', '0', '0', '0', 0
 errorProgram db 0
 zero dw 0
 flagFraseProblem db 0
@@ -42,6 +43,7 @@ messageCharFrase db 'CARACTERE DA FRASE NAO ENCONTRADO NO ARQUIVO', '$'
 messageSize db 'TAMANHO DA FRASE: ', '$'
 messageSizeMax db 'TAMANHO DA FRASE EXCEDEU O LIMITE', '$'
 messageFraseVazia db 'FRASE VAZIA (NAO POSSUI CARACTERE)', '$'
+messageLenghtTXT db 'TAMANHO DO ARQUIVO .txt: ', '$'
 messageBytes db ' bytes', '$'
 messageFalseError db 'PROCESSAMENTO REALIZADO SEM ERROS', '$'
 messageTrueError db 'PROCESSAMENTO REALIZADO COM ERROS', '$'
@@ -198,6 +200,14 @@ LerBloco:
     
     jc ErrorReading     ; desvia se carry flag estiver ligada - erro!
 
+    mov si, offset Buffer
+contaTxt:
+    cmp al, 0
+    je nextString
+    lodsb
+    inc lenghtTXT_number
+    jmp contaTxt
+
 nextString:
     mov flagCharFrase, 0
     
@@ -236,7 +246,6 @@ avante:
     jmp nextTxt
       
 escreveKrp:
-
     mov indicadorPosicao, 0
     mov iteracaoArray, 0 
     cmp lenghtArray, 0
@@ -355,6 +364,7 @@ ErrorOpening:
 
 ErrorReading:
 ;--- printa mensagem de erro ---;
+    call quebraLinha
     mov dx, offset ReadError ; exibe um erro
     mov ah,09h              ; usando a fun��o 09h
     int 21h                 ; chama servi�o do DOS
@@ -362,6 +372,7 @@ ErrorReading:
     
 erroCriacao:
 ;--- printa mensagem de erro ---;
+    call quebraLinha
     lea dx, messageCriaco 
     mov ah, 09H 
     int 21H
@@ -369,6 +380,7 @@ erroCriacao:
 
 erroFraselonga:
 ;--- printa mensagem de erro ---;
+    call quebraLinha
     lea dx, messageSizeMax
     mov ah, 09H
     int 21h
@@ -376,6 +388,7 @@ erroFraselonga:
 
 erroFraseVazia:
 ;--- printa mensagem de erro ---;
+    call quebraLinha
     lea dx, messageFraseVazia
     mov ah, 09H
     int 21h
@@ -413,7 +426,7 @@ endProgram:
 
     call quebraLinha
 
-;--- mensagem de tamanho ---; 
+;--- mensagem de tamanho da frase ---; 
     lea dx, messageSize   
     mov ah, 09H 
     int 21H
@@ -424,7 +437,23 @@ endProgram:
     lea dx, messageBytes    ; imprime " bytes"   
     mov ah, 09H 
     int 21H
+
+;--- mensagem de tamanho do arquivo ---; 
+    call quebraLinha
+    lea dx, messageLenghtTXT   
+    mov ah, 09H 
+    int 21H
+    lea si, lenghtTXT_str
+    mov ax, lenghtTXT_number
+    sub ax, 1                   ; retira a ultima iteracao de final de arquivo
+    call NumberToStr
+    lea bx, lenghtTXT_str
+    call printf_s
+    lea dx, messageBytes        ; imprime " bytes"   
+    mov ah, 09H 
+    int 21H
     
+    call quebraLinha
     call quebraLinha
     call quebraLinha
     
@@ -507,6 +536,47 @@ pulaPosicao:
     inc bx
     jmp	printf_s
 printf_s	endp
+
+NumberToStr proc near
+    
+    mov dx, 0
+    mov bx, 10000
+    div bx
+    add al, '0'
+    mov [si], al
+    mov ax, dx
+    inc si
+    
+    mov dx, 0
+    mov bx, 1000
+    div bx
+    add al, '0'
+    mov [si], al
+    mov ax, dx
+    inc  si
+    
+    mov dx, 0
+    mov bx, 100
+    div bx
+    add al, '0'
+    mov [si], al
+    mov ax, dx
+    inc si
+    
+    mov dx, 0
+    mov bx, 10
+    div bx
+    add al, '0'
+    mov [si], al
+    mov ax, dx
+    inc si
+    
+    add dx, '0'
+    mov [si], dl
+    
+    ret
+
+NumberToStr endp
 
 quebraLinha proc near
     mov ah,2
