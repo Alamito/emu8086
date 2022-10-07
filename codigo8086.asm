@@ -108,13 +108,9 @@ continua:
     je erroFraseVazia
     cmp flagFraseProblem, 100
     jnl erroFraselonga
-;--- quebra linha ---;
-    mov ah,2
-    mov dl,0dh
-    int 21h
-    mov dl,0ah
-    int 21h
-    
+
+    call quebraLinha
+
 ;--- mensagem de leitura ---;
     lea dx, messageGetFile   
     mov ah, 09H 
@@ -149,19 +145,8 @@ strCopy:
     lea di, krp
     call concatena
 
-;--- quebra linha ---;
-    mov ah,2
-    mov dl,0dh
-    int 21h
-    mov dl,0ah
-    int 21h
-
-;--- quebra linha ---;
-    mov ah,2
-    mov dl,0dh
-    int 21h
-    mov dl,0ah
-    int 21h
+    call quebraLinha
+    call quebraLinha
 
 ;--- mensagem de leitura ---;
     lea dx, messageNameFile   
@@ -171,12 +156,7 @@ strCopy:
     mov ah, 09H 
     int 21H
 
-;--- quebra linha ---;
-    mov ah,2
-    mov dl,0dh
-    int 21h
-    mov dl,0ah
-    int 21h
+    call quebraLinha
     
 ;--- mensagem de leitura ---;
     lea dx, messageNameFileKrp   
@@ -194,12 +174,7 @@ strCopy:
     mov  bx, ax
     jc erroCriacao
     
-;--- quebra linha ---;
-    mov ah,2
-    mov dl,0dh
-    int 21h
-    mov dl,0ah
-    int 21h
+    call quebraLinha
 
 ;--- inicia leitura do arquivo .txt ---;    
     mov dx,offset nameFile  ; coloca o endereco do nome do arquivo em dx
@@ -338,41 +313,6 @@ TestaCharFrase:
     
     jmp nextString
     
-
-ErrorOpening:
-;--- printa mensagem de erro ---;
-    mov dx,offset OpenError ; exibe um erro
-    mov ah,09h              ; usando a fun��o 09h
-    int 21h                 ; chama servi�o do DOS
-    mov ax,4C01h            ; termina programa com um errorlevel =1 
-    int 21h 
-
-ErrorReading:
-;--- printa mensagem de erro ---;
-    mov dx, offset ReadError ; exibe um erro
-    mov ah,09h              ; usando a fun��o 09h
-    int 21h                 ; chama servi�o do DOS
-    mov ax,4C02h            ; termina programa com um errorlevel =2
-    int 21h
-    
-erroCriacao:
-;--- printa mensagem de erro ---;
-    lea dx, messageCriaco 
-    mov ah, 09H 
-    int 21H
-    jmp theEnd
-
-erroFraselonga:
-    lea dx, messageSizeMax
-    mov ah, 09H
-    int 21h
-    jmp theEnd
-
-erroFraseVazia:
-    lea dx, messageFraseVazia
-    mov ah, 09H
-    int 21h
-    jmp theEnd
     
 charInvalido:
     mov errorProgram, 1
@@ -404,6 +344,41 @@ retornaValor:
     add si, indexTxt        
     inc si                  ; incrementa para a proxima posicao do .txt
     jmp nextTxt             ; pula para o proximo char dps do que foi recem testado
+
+ErrorOpening:
+;--- printa mensagem de erro ---;
+    mov dx,offset OpenError ; exibe um erro
+    mov ah,09h              ; usando a fun��o 09h
+    int 21h                 ; chama servi�o do DOS
+    jmp trueError 
+
+ErrorReading:
+;--- printa mensagem de erro ---;
+    mov dx, offset ReadError ; exibe um erro
+    mov ah,09h              ; usando a fun��o 09h
+    int 21h                 ; chama servi�o do DOS
+    jmp trueError
+    
+erroCriacao:
+;--- printa mensagem de erro ---;
+    lea dx, messageCriaco 
+    mov ah, 09H 
+    int 21H
+    jmp trueError
+
+erroFraselonga:
+;--- printa mensagem de erro ---;
+    lea dx, messageSizeMax
+    mov ah, 09H
+    int 21h
+    jmp trueError
+
+erroFraseVazia:
+;--- printa mensagem de erro ---;
+    lea dx, messageFraseVazia
+    mov ah, 09H
+    int 21h
+    jmp trueError
     
     
 endProgram:
@@ -425,7 +400,7 @@ endProgram:
 
 ;--- escreve no arquivo ---;   
     mov bx, [handle]
-    mov dx, offset zero
+    mov dx, offset zero     ; coloca 00 00 no final do arquivo
     mov cx, 2
     mov ah, 40h
     int 21h 
@@ -434,12 +409,8 @@ endProgram:
     mov bx, [handle]
     mov ah, 3eh
     int 21h
-;--- quebra linha ---;
-    mov ah,2
-    mov dl,0dh
-    int 21h
-    mov dl,0ah
-    int 21h
+
+    call quebraLinha
 
 ;--- mensagem de tamanho ---; 
     lea dx, messageSize   
@@ -453,19 +424,8 @@ endProgram:
     mov ah, 09H 
     int 21H
     
-;--- quebra linha ---;
-    mov ah,2
-    mov dl,0dh
-    int 21h
-    mov dl,0ah
-    int 21h
-    
-;--- quebra linha ---;
-    mov ah,2
-    mov dl,0dh
-    int 21h
-    mov dl,0ah
-    int 21h
+    call quebraLinha
+    call quebraLinha
     
     cmp errorProgram, 1
     je trueError
@@ -475,6 +435,7 @@ endProgram:
     jmp theEnd
     
 trueError:
+    call quebraLinha
     lea dx, messageTrueError   
     mov ah, 09H 
     int 21H
@@ -482,7 +443,7 @@ theEnd:
     mov ax,4C00h    ; termina programa
     int 21h
     
-    main endp
+main endp
 
 
 
@@ -523,7 +484,8 @@ out_copy:
     ret
 CopyString  endp
 
-printf_s	proc	near
+;--- printa string de numeros ---;
+printf_s	proc	near     
 	mov		dl,[bx]
 	cmp		dl,0
 	je		ps_1
@@ -539,5 +501,14 @@ printf_s	proc	near
 ps_1:
 	ret
 printf_s	endp
+
+quebraLinha proc near
+    mov ah,2
+    mov dl,0dh
+    int 21h
+    mov dl,0ah
+    int 21h
+    ret
+quebraLinha endp
 
 end main
