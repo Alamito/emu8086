@@ -24,6 +24,7 @@ flagCharFrase db 0
 lenghtFrase db '0', '0', '0', 0
 errorProgram db 0
 zero dw 0
+flagFraseProblem db 0
 arrayPosicao dw 105 dup (?)   ; guarda em um vetor as posicoes ja usadas do .txt
 
 ;--- mensagens ao user ---;
@@ -35,9 +36,11 @@ messageGetCripto DB 'INSIRA O TEXTO A SER CRIPTOGRAFADO: ', '$'
 messageNameFile DB 'INPUT: ','$'
 messageNameFileKrp DB 'OUTPUT: ','$'
 messageVazio db 'ARQUIVO (.txt) DE LEITURA VAZIO', '$'
-messageInvalido db 'CARACTERE INVALIDO!', '$'
-messageCharFrase db 'CARACTERE NAO ENCONTRADO NO ARQUIVO', '$'
+messageInvalido db 'CARACTERE DA FRASE INVALIDO!', '$'
+messageCharFrase db 'CARACTERE DA FRASE NAO ENCONTRADO NO ARQUIVO', '$'
 messageSize db 'TAMANHO DA FRASE: ', '$'
+messageSizeMax db 'TAMANHO DA FRASE EXCEDEU O LIMITE', '$'
+messageFraseVazia db 'FRASE VAZIA (NAO POSSUI CARACTERE)', '$'
 messageBytes db ' bytes', '$'
 messageFalseError db 'PROCESSAMENTO REALIZADO SEM ERROS', '$'
 messageTrueError db 'PROCESSAMENTO REALIZADO COM ERROS', '$'
@@ -62,9 +65,11 @@ getNameCripto:
     int 21h
     cmp al, 13
     je continua
+    inc flagFraseProblem
     mov [si], al                ; armazena
     inc si                      ; incrementa index  
-                          
+
+ ;--- armazena em um array o numero de bytes da frase ---;                         
     mov al, [di+2]
     cmp al,'9'
     je incrementaDecimos
@@ -95,12 +100,14 @@ incrementaCentesimos:
 tratarCentesimo:
     mov al,[di+2]
     cmp al, '1'
-    ;je erroFraselonga
+    je erroFraselonga
     jmp loopContador
 
-
-
-continua:    
+continua:
+    cmp flagFraseProblem, 0
+    je erroFraseVazia
+    cmp flagFraseProblem, 100
+    jnl erroFraselonga
 ;--- quebra linha ---;
     mov ah,2
     mov dl,0dh
@@ -136,11 +143,11 @@ strCopy:
     
     lea si, nameFile
     lea di, txt
-    call ConcatTxt
+    call concatena
    
     lea si, nameFileKrp
     lea di, krp
-    call ConcatTxt
+    call concatena
 
 ;--- quebra linha ---;
     mov ah,2
@@ -354,6 +361,18 @@ erroCriacao:
     mov ah, 09H 
     int 21H
     jmp theEnd
+
+erroFraselonga:
+    lea dx, messageSizeMax
+    mov ah, 09H
+    int 21h
+    jmp theEnd
+
+erroFraseVazia:
+    lea dx, messageFraseVazia
+    mov ah, 09H
+    int 21h
+    jmp theEnd
     
 charInvalido:
     mov errorProgram, 1
@@ -467,7 +486,7 @@ theEnd:
 
 
 
-ConcatTxt  proc    near
+concatena  proc    near
 init_concat:
     mov al, '$'
     cmp al, [si]
@@ -487,7 +506,7 @@ out_loop:
     mov al, 0h
     mov [si], al
     ret
-concatTxt endp
+concatena endp
 
 CopyString  proc    near
 loop_copy:
