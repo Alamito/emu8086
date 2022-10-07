@@ -22,6 +22,7 @@ indicadorArray dw 0             ; indica quantos bytes deve ser pulado desde o i
 indicadorPosicao dw 0           ; indica os bytes a serem pulados no vetor de posicao
 flagCharFrase db 0
 lenghtFrase db '0', '0', '0', 0
+lenghtTXT db '0', '0', '0', '0', '0', 0
 errorProgram db 0
 zero dw 0
 flagFraseProblem db 0
@@ -486,20 +487,25 @@ CopyString  endp
 
 ;--- printa string de numeros ---;
 printf_s	proc	near     
-	mov		dl,[bx]
-	cmp		dl,0
-	je		ps_1
+	mov	dl,[bx]
+	cmp	dl,0
+	je	ps_1
+	cmp dl, '0'
+	je pulaPosicao
 
-	push	bx
-	mov		ah,2
-	int		21H
-	pop		bx
+	push bx
+	mov	ah,2
+	int	21H
+	pop	bx
 
-	inc		bx		
-	jmp		printf_s
+	inc	bx		
+	jmp	printf_s
 		
 ps_1:
 	ret
+pulaPosicao:
+    inc bx
+    jmp	printf_s
 printf_s	endp
 
 quebraLinha proc near
