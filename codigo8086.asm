@@ -19,13 +19,15 @@ lenghtArray dw 0                ; guarda o tamanho do vetor de posicoes
 iteracaoArray dw 0              ; usado para terminar o loop de comparacoes com o vetor de posicoes
 indicadorArray dw 0             ; indica quantos bytes deve ser pulado desde o inicio do vetor de posicoes
 indicadorPosicao dw 0           ; indica os bytes a serem pulados no vetor de posicao
-flagCharFrase db 0
-lenghtFrase db '0', '0', '0', 0
-lenghtTXT_number dw 0
-lenghtTXT_str db '0', '0', '0', '0', '0', 0
-errorProgram db 0
-zero dw 0
-flagFraseProblem db 0
+flagCharFrase db 0              ; flag de char ja utilizado
+lenghtFrase db '0', '0', '0', 0 ; tamanho em string da frase
+lenghtTXT_number dw 0           ; tamanho em numero do .txt
+lenghtTXT_str db '0', '0', '0', '0', '0', 0 ; tamanho em string do .txt
+errorProgram db 0               ; flag de erro
+zero dw 0                       ; zero 
+flagFraseProblem db 0           ; flag de erro na frasw
+DTA db 45 dup (?)               ; indica erro no tamanho do .txt
+tam_arq dw 0                    ; compara com DTA para verificar erro
 arrayPosicao dw 105 dup (?)   ; guarda em um vetor as posicoes ja usadas do .txt
 
 ;--- mensagens ao user ---;
@@ -44,6 +46,7 @@ messageSizeMax db 'TAMANHO DA FRASE EXCEDEU O LIMITE', '$'
 messageFraseVazia db 'FRASE VAZIA (NAO POSSUI CARACTERE)', '$'
 messageArquivoVazio db 'ARQUIVO VAZIO (NAO POSSUI CARACTERE)', '$'
 messageLenghtTXT db 'TAMANHO DO ARQUIVO .txt: ', '$'
+messageTXTGrande db 'ARQUIVO DE ENTRADA MUITO GRANDE', '$'
 messageBytes db ' bytes', '$'
 messageZeroArq db '0 bytes', '$'
 messageFalseError db 'PROCESSAMENTO REALIZADO SEM ERROS', '$'
@@ -75,36 +78,34 @@ getNameCripto:
 
  ;--- armazena em um array o numero de bytes da frase ---;                         
     mov al, [di+2]
-    cmp al,'9'
+    cmp al,'9'              ; se for acima de 9 incrementa a casa do decimo
     je incrementaDecimos
     inc al
-    mov [di+2],al
+    mov [di+2],al           ; armazena numero no vetor
 loopContador:
-    jmp getNameCripto
+    jmp getNameCripto       ; retorna para pegar nova letra
 
 incrementaDecimos:
     mov al, '0'
     mov [di+2], al
     mov al, [di+1]
-    cmp al,'9'
+    cmp al,'9'              ; se for acima de 9 incrementa a casa do centesimo
     je incrementaCentesimos
     inc al
-    mov [di+1],al
+    mov [di+1],al           ; armazena numero no vetor
     jmp loopContador
 incrementaCentesimos:
     mov al, '0'
-    mov [di+1], al
+    mov [di+1], al          
     mov al, [di]
     cmp al,'1'
     je tratarCentesimo
     mov al, '1'
-    mov [di],al
+    mov [di],al         ; armazena numero no vetor
     jmp loopContador
 
 tratarCentesimo:
-    mov al,[di+2]
-    cmp al, '1'
-    je erroFraselonga
+    mov al,[di+2]       
     jmp loopContador
 
 continua:
@@ -124,7 +125,7 @@ continua:
     
 ;--- leitura do nome do arquivo ---;    
     mov bl, 0
-    mov si, offset nameFile ; si point the array
+    mov si, offset nameFile ; ponteiro para o arquivo .txt
 getNameFile:
     mov ah, 1
     int 21h
@@ -184,23 +185,26 @@ strCopy:
     mov dx,offset nameFile  ; coloca o endereco do nome do arquivo em dx
     mov al,2                ; modo de acesso - leitura e escrita
     mov ah,3Dh              ; funcao 3Dh - abre um arquivo
-    int 21h                 ; chama servi�o do DOS
+    int 21h                 
     
     mov Handle,ax           ; guarda o manipulador do arquivo para mais tarde
     jc ErrorOpening         ; desvia se carry flag estiver ligada - erro!
+
+    call testeArqGrande
     
-    mov dx,offset Buffer    ; endere�o do buffer em dx
+    mov dx, offset Buffer   ; buffer vai ser iterado entre as letras do arquivo .txt
 
     mov bx,Handle       ; manipulador em bx
     mov cx,65535        ; quantidade de bytes a serem lidos
     mov ah,3Fh          ; funcao 3Fh - leitura de arquivo
-    int 21h             ; chama servi�o do DOS
+    int 21h             
     
     jc ErrorReading     ; desvia se carry flag estiver ligada - erro!
 
     mov si, offset Buffer
-    cmp al, 0
+    cmp al, 0           ; identifica se esta vazio o .txt
     je endProgram
+;--- conta a quantidade de letras no arquivo ---;
 contaTxt:
     cmp al, 0
     je nextString
@@ -209,7 +213,7 @@ contaTxt:
     jmp contaTxt
 
 nextString:
-    mov flagCharFrase, 0
+    mov flagCharFrase, 0        ; reset da flag de letra que foi utilizada
     
     mov si, offset stringCripto ; ponteiro para o inicio da string
     add si, indexString         ; pula para a letra da string
@@ -282,7 +286,7 @@ armazenaPosicao:                 ; armazena a posicao do .txt no vetor
 ;--- coloca o file pointer para o final do arquivo ---;    
     mov bx, ax
     mov ah, 42h  ; "lseek"
-    mov al, 2    ; position relative to end of file
+    mov al, 2    ; define a posicao para o final
     mov cx, 0    ; offset MSW
     mov dx, 0    ; offset LSW
     int 21h
@@ -326,8 +330,8 @@ TestaCharFrase:
     
 charInvalido:
     mov errorProgram, 1
-    lea dx, messageInvalido ; load address of the string  
-    mov ah, 09H             ; output the string
+    lea dx, messageInvalido ; carrega endereco da string
+    mov ah, 09H             ; output da string
     int 21H
 ;--- quebra linha ---;
     mov ah,2
@@ -358,16 +362,16 @@ retornaValor:
 ErrorOpening:
 ;--- printa mensagem de erro ---;
     mov dx,offset OpenError ; exibe um erro
-    mov ah,09h              ; usando a fun��o 09h
-    int 21h                 ; chama servi�o do DOS
+    mov ah,09h              
+    int 21h                 
     jmp trueError 
 
 ErrorReading:
 ;--- printa mensagem de erro ---;
     call quebraLinha
     mov dx, offset ReadError ; exibe um erro
-    mov ah,09h              ; usando a fun��o 09h
-    int 21h                 ; chama servi�o do DOS
+    mov ah,09h              
+    int 21h                
     jmp trueError
     
 erroCriacao:
@@ -397,6 +401,13 @@ erroFraseVazia:
 erroArquivoVazio:
     call quebraLinha
     lea dx, messageArquivoVazio
+    mov ah, 09H
+    int 21h
+    jmp trueError
+
+ErroTxtGrande:
+    call quebraLinha
+    lea dx, messageTXTGrande
     mov ah, 09H
     int 21h
     jmp trueError
@@ -515,15 +526,16 @@ out_loop:
     ret
 concatena endp
 
+;--- strCopy ---;
 CopyString  proc    near
 loop_copy:
-    mov al, '$'
+    mov al, '$'     ; indica fim da string
     cmp [si], al
     je out_copy
     mov bl,[si]
-    mov [di], bl
-    inc si
-    inc di
+    mov [di], bl    ; move char de uma string para a outra
+    inc si          
+    inc di          ; incrementa as posicoes das strings
     jmp loop_copy
 out_copy:
     mov [di], al
@@ -535,7 +547,7 @@ printf_s	proc	near
 	mov	dl,[bx]
 	cmp	dl,0
 	je	ps_1
-	cmp dl, '0'
+	cmp dl, '0'     ; evita print de "zeros" a esquerda
 	je pulaPosicao
 
 	push bx
@@ -553,18 +565,19 @@ pulaPosicao:
     jmp	printf_s
 printf_s	endp
 
+;--- transforma numero em string ---;
 NumberToStr proc near
 
-    mov dx, 0
-    mov bx, 10000
+    mov dx, 0           ; reset de dx
+    mov bx, 10000       ; pega a casa da dezena de milhar
     div bx
-    add al, '0'
-    mov [si], al
-    mov ax, dx
+    add al, '0'         ; pula para o escopo de numero da tabela ASCII
+    mov [si], al        
+    mov ax, dx          ; move o resto para ax
     inc si
     
-    mov dx, 0
-    mov bx, 1000
+    mov dx, 0   
+    mov bx, 1000        ; pega a casa de unidade de milhar
     div bx
     add al, '0'
     mov [si], al
@@ -572,7 +585,7 @@ NumberToStr proc near
     inc  si
     
     mov dx, 0
-    mov bx, 100
+    mov bx, 100         ; pega a casa da centena
     div bx
     add al, '0'
     mov [si], al
@@ -580,19 +593,38 @@ NumberToStr proc near
     inc si
     
     mov dx, 0
-    mov bx, 10
+    mov bx, 10          ; pega a casa da dezena 
     div bx
     add al, '0'
     mov [si], al
     mov ax, dx
     inc si
     
-    add dx, '0'
-    mov [si], dl
+    add dx, '0'         
+    mov [si], dl        ; move a casa da unidade para a string
     
     ret
 
 NumberToStr endp
+
+;--- testa se o arquivo tem mais de 64Kb ---;
+testeArqGrande proc near
+
+    lea dx, DTA
+    mov ah, 1ah
+    int 21h                     ; define o endereco de disco em DTA
+    mov ah, 4eh
+    mov cx, 0
+    lea dx, nameFile
+    int 21h                     ; retorna especificacoes do arquivo
+    lea bx, DTA
+    mov ax, word ptr[bx+26]     ; salva o tamanho do arquivo
+    mov tam_arq, ax
+    mov ax, word ptr[bx+28]
+    cmp ax, 0                   ; testa se eh maior que 64Kb
+    jne ErroTxtGrande
+
+testeArqGrande endp
 
 quebraLinha proc near
     mov ah,2
