@@ -7,7 +7,6 @@ nameFileKrp db 15 dup('$')
 stringCripto db 105 dup('$')
 Handle DW ?                  ; guarda o manipulador do arquivo
 Buffer DB 4096 dup (?)       ; buffer para armazenar dados
-handler dw ?
 
 ;--- variaveis de auxilio/logica/iteracao ---;
 caractereStr db 0               ; guarda caractere da string
@@ -43,6 +42,7 @@ messageCharFrase db 'CARACTERE DA FRASE NAO ENCONTRADO NO ARQUIVO', '$'
 messageSize db 'TAMANHO DA FRASE: ', '$'
 messageSizeMax db 'TAMANHO DA FRASE EXCEDEU O LIMITE', '$'
 messageFraseVazia db 'FRASE VAZIA (NAO POSSUI CARACTERE)', '$'
+messageArquivoVazio db 'ARQUIVO VAZIO (NAO POSSUI CARACTERE)', '$'
 messageLenghtTXT db 'TAMANHO DO ARQUIVO .txt: ', '$'
 messageBytes db ' bytes', '$'
 messageFalseError db 'PROCESSAMENTO REALIZADO SEM ERROS', '$'
@@ -190,9 +190,6 @@ strCopy:
     
     mov dx,offset Buffer    ; endere�o do buffer em dx
 
-LerBloco:
-    cmp al, 0
-    je theEnd
     mov bx,Handle       ; manipulador em bx
     mov cx,65535        ; quantidade de bytes a serem lidos
     mov ah,3Fh          ; funcao 3Fh - leitura de arquivo
@@ -201,6 +198,8 @@ LerBloco:
     jc ErrorReading     ; desvia se carry flag estiver ligada - erro!
 
     mov si, offset Buffer
+    cmp al, 0
+    je erroArquivoVazio
 contaTxt:
     cmp al, 0
     je nextString
@@ -390,6 +389,13 @@ erroFraseVazia:
 ;--- printa mensagem de erro ---;
     call quebraLinha
     lea dx, messageFraseVazia
+    mov ah, 09H
+    int 21h
+    jmp trueError
+
+erroArquivoVazio:
+    call quebraLinha
+    lea dx, messageArquivoVazio
     mov ah, 09H
     int 21h
     jmp trueError
