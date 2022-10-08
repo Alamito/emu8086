@@ -45,6 +45,7 @@ messageFraseVazia db 'FRASE VAZIA (NAO POSSUI CARACTERE)', '$'
 messageArquivoVazio db 'ARQUIVO VAZIO (NAO POSSUI CARACTERE)', '$'
 messageLenghtTXT db 'TAMANHO DO ARQUIVO .txt: ', '$'
 messageBytes db ' bytes', '$'
+messageZeroArq db '0 bytes', '$'
 messageFalseError db 'PROCESSAMENTO REALIZADO SEM ERROS', '$'
 messageTrueError db 'PROCESSAMENTO REALIZADO COM ERROS', '$'
  
@@ -199,7 +200,7 @@ strCopy:
 
     mov si, offset Buffer
     cmp al, 0
-    je erroArquivoVazio
+    je endProgram
 contaTxt:
     cmp al, 0
     je nextString
@@ -452,13 +453,16 @@ endProgram:
     lea si, lenghtTXT_str
     mov ax, lenghtTXT_number
     sub ax, 1                   ; retira a ultima iteracao de final de arquivo
+    cmp ax, -1
+    je zeroBytesArq    
     call NumberToStr
     lea bx, lenghtTXT_str
     call printf_s
     lea dx, messageBytes        ; imprime " bytes"   
     mov ah, 09H 
     int 21H
-    
+
+adiante:  
     call quebraLinha
     call quebraLinha
     call quebraLinha
@@ -478,7 +482,13 @@ trueError:
 theEnd:
     mov ax,4C00h    ; termina programa
     int 21h
-    
+
+zeroBytesArq:
+    lea dx, messageZeroArq   
+    mov ah, 09H 
+    int 21H
+    jmp adiante
+
 main endp
 
 
@@ -544,7 +554,7 @@ pulaPosicao:
 printf_s	endp
 
 NumberToStr proc near
-    
+
     mov dx, 0
     mov bx, 10000
     div bx
