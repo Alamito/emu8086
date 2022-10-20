@@ -19,7 +19,7 @@ Ainda há outras ocasiões onde os caracteres da mensagem não é criptografada:
 Obs:
 - não importa se os caracteres são minusculos ou maiusculos, eles são tratados como iguais.
 - a mensagem tem que possuir no máximo 100 caracteres.
-- o arquivo .txt tem que possuir um tamanho de 64Kb.
+- o arquivo .txt tem que possuir um tamanho máximo de 64Kb.
 - no final do arquivo .krp é inserido o valor 0 para indicar o final do arquivo.
 
 # Apresentação do projeto
