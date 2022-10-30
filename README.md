@@ -11,9 +11,9 @@ Há diversas maneiras de criptografar uma mensagem utilizando esteganografia e n
 
 Obs: 0A 00, 04 00, 06 00, etc. significa 10, 4 e 6, respectivamente em decimal, e tais valores estão escritos em hexadecimal formado por 2 bytes.
 
-Ainda há outras ocasiões onde os caracteres da mensagem não é criptografada:
+Ainda há outras ocasiões onde os caracteres da mensagem não são criptografados:
 - caso não haja correspondência no arquivo .txt.
-- caso a posição de criptografia foi ocupada anteriormente por outro caractere. Por exemplo, no exemplo anterior caso a mensagem fosse "strings", o último "s" não seria criptograda, porque a posição (10 ou 0A 00) de criptografia foi ocupada pelo primeiro "s" da palavra "strings".
+- caso a posição de criptografia foi ocupada anteriormente por outro caractere. Por exemplo, no exemplo anterior caso a mensagem fosse "strings", o último "s" não seria criptografado, porque a posição (10 ou 0A 00) de criptografia foi ocupada pelo primeiro "s" da palavra "strings".
 - caso a mensagem possua caracteres menores que 33 ou maiores que 126 (decimal, segundo tabela ASCII).
 - a posição 0 do .txt não faz parte da criptografia, no caso a criptografia começa a partir da posição 1.
 
